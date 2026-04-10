@@ -65,11 +65,12 @@ function httpRequest(options, body = null) {
 async function fetchXinzhiNotes(pageIndex = 1, pageSize = 50) {
   const options = {
     hostname: 'api.xinzhi.zone',
-    path: `/v1/notes?pageIndex=${pageIndex}&pageSize=${pageSize}`,
+    path: `/api/v1/notes?pageIndex=${pageIndex}&pageSize=${pageSize}`,
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${XINZHI_TOKEN}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'x-request-source': 'xinzhi-cli'  // CLI 需要的请求头
     }
   };
   return httpRequest(options);
@@ -79,11 +80,12 @@ async function fetchXinzhiNotes(pageIndex = 1, pageSize = 50) {
 async function deleteXinzhiNote(noteId) {
   const options = {
     hostname: 'api.xinzhi.zone',
-    path: `/v1/notes/${noteId}`,
+    path: `/api/v1/notes/${noteId}`,
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${XINZHI_TOKEN}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'x-request-source': 'xinzhi-cli'
     }
   };
   return httpRequest(options);
@@ -155,12 +157,12 @@ async function main() {
   const notesResponse = await fetchXinzhiNotes();
 
   if (!notesResponse.success || !notesResponse.data) {
-    console.log('❌ 获取笔记失败:', notesResponse);
+    console.log('❌ 获取笔记失败:', JSON.stringify(notesResponse));
     return;
   }
 
   const notes = notesResponse.data.list || [];
-  console.log(`📦 获取到 ${notes.length} 条笔记`);
+  console.log(`📦 获取到 ${notes.length} 条笔记，总计: ${notesResponse.data.total}`);
 
   // 筛选小红书链接
   const xiaohongshuNotes = notes.filter(note => {
@@ -168,6 +170,8 @@ async function main() {
     return note.link.includes('xiaohongshu.com') ||
            note.link.includes('xhslink.com');
   });
+
+  console.log(`🔴 其中 ${xiaohongshuNotes.length} 条是小红书链接`);
 
   // 过滤已处理的
   const newNotes = xiaohongshuNotes.filter(note => !processedIds.has(note.id));
