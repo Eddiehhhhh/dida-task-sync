@@ -1,0 +1,12 @@
+{
+  "name": "xinzhi-to-getnote",
+  "version": "1.0.0",
+  "description": "自动将新枝中的小红书链接同步到 Get笔记",
+  "main": "sync.js",
+  "scripts": {
+    "start": "node sync.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

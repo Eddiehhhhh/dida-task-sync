@@ -1,0 +1,37 @@
+name: Sync Xiaohongshu Links
+
+on:
+  schedule:
+    # 每 5 分钟执行一次
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    # 允许手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run sync script
+        run: node sync.js
+        env:
+          XINZHI_TOKEN: ${{ secrets.XINZHI_TOKEN }}
+          GETNOTE_API_KEY: ${{ secrets.GETNOTE_API_KEY }}
+
+      - name: Commit processed IDs
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update processed IDs"
+          file_pattern: "processed_ids.json"

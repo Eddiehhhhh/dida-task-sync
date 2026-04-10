@@ -1,0 +1,16 @@
+# 日志文件
+*.log
+npm-debug.log*
+
+# 依赖
+node_modules/
+
+# 本地处理记录（会被自动提交更新）
+# processed_ids.json 会自动同步
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
