@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -29,10 +31,3 @@ jobs:
         env:
           XINZHI_TOKEN: ${{ secrets.XINZHI_TOKEN }}
           GETNOTE_API_KEY: ${{ secrets.GETNOTE_API_KEY }}
-
-      - name: Commit processed IDs
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Update processed IDs"
-          file_pattern: "processed_ids.json"
-          commit_options: "--force"
