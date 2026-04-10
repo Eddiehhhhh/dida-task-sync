@@ -2,10 +2,11 @@ name: Sync Xiaohongshu Links
 
 on:
   schedule:
-    # 每 5 分钟执行一次
     - cron: '*/5 * * * *'
   workflow_dispatch:
-    # 允许手动触发
+
+permissions:
+  contents: write
 
 jobs:
   sync:
