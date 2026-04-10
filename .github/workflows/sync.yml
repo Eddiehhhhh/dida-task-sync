@@ -35,3 +35,4 @@ jobs:
         with:
           commit_message: "Update processed IDs"
           file_pattern: "processed_ids.json"
+          commit_options: "--force"
