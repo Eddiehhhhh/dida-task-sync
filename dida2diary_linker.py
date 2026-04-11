@@ -44,19 +44,56 @@ def get_dida_tasks_for_date(target_date: str) -> list:
     """
     获取滴答清单指定日期的任务
     包括：截止日期在当天的任务 + 日期范围覆盖当天的任务
+    检查所有清单（不只是收集箱）
     """
-    url = f"{DIDA_BASE}/open/v1/project/inbox/data"
-    response = requests.get(url, headers=DIDA_HEADERS)
+    # 所有清单ID
+    PROJECT_IDS = {
+        "濠联": "5e4cfef0c7edd11da9d5d956",
+        "产品AI": "6825ab4ef12d11b11d7a4438",
+        "杂事": "6047b441e99211186ac946e9",
+        "旅行": "6825aa6e4750d1b11d7a28a5",
+        "学术": "6406ebd9ccacd1017417b974",
+        "理财": "69870dfa2fae5176a082bb20",
+        "shopee": "686e9aec5c5751e8c67cade5",
+        "书籍": "5ff9ffd8fa6d5106156432a9",
+        "工作": "6493430012fa510358848b31",
+        "健康": "68027b74e3d0d1f4189d4578",
+        "影剧": "5ff9fffdf313d106156432d5fc",
+        "展览活动": "69a2c97dc101d162759eee4d",
+        "自我管理": "65e40aed3e64110443527cf5",
+        "购物": "6309c13dd063d1013009fb4e",
+    }
     
-    if response.status_code != 200:
-        print(f"获取滴答任务失败: {response.status_code}")
-        return []
+    all_tasks = []
     
-    data = response.json()
-    tasks = data.get("tasks", [])
+    # 先获取收集箱
+    inbox_url = f"{DIDA_BASE}/open/v1/project/inbox/data"
+    response = requests.get(inbox_url, headers=DIDA_HEADERS)
+    if response.status_code == 200:
+        data = response.json()
+        all_tasks.extend(data.get("tasks", []))
     
+    # 再遍历所有清单
+    for project_name, project_id in PROJECT_IDS.items():
+        url = f"{DIDA_BASE}/open/v1/project/{project_id}/data"
+        resp = requests.get(url, headers=DIDA_HEADERS)
+        if resp.status_code == 200:
+            data = resp.json()
+            tasks = data.get("tasks", [])
+            all_tasks.extend(tasks)
+    
+    # 去重（根据task_id）
+    seen_ids = set()
+    unique_tasks = []
+    for t in all_tasks:
+        tid = t.get("id", "")
+        if tid and tid not in seen_ids:
+            seen_ids.add(tid)
+            unique_tasks.append(t)
+    
+    # 匹配目标日期
     matched_tasks = []
-    for task in tasks:
+    for task in unique_tasks:
         task_id = task.get("id", "")
         title = task.get("title", "")
         due_date = task.get("dueDate", "")[:10] if task.get("dueDate") else ""
