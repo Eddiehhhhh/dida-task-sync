@@ -6,6 +6,11 @@ on:
     - cron: '*/5 * * * *'
   # 手动触发
   workflow_dispatch:
+    inputs:
+      force:
+        description: '强制重新处理所有最近笔记（忽略已处理记录）'
+        required: false
+        default: 'false'
   # 外部服务触发（如 cron-job.org）
   repository_dispatch:
     types: [sync]
@@ -16,13 +21,14 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           persist-credentials: true
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,6 +46,7 @@ jobs:
           GETNOTE_CLIENT_ID: ${{ secrets.GETNOTE_CLIENT_ID }}
 
       - name: Commit processed IDs
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -52,4 +59,14 @@ jobs:
             git push origin main || echo "Push 失败，继续执行"
           fi
 
-# Updated: Sat Apr 11 04:43:56 CST 2026
+      - name: Report status
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "Workflow 执行完成: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "=========================================="
+          echo "触发方式: ${{ github.event_name }}"
+          echo "运行 ID: ${{ github.run_id }}"
+          echo "=========================================="
+
+# Updated: Sun Apr 12 08:22:40 CST 2026
