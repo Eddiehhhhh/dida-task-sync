@@ -40,9 +40,9 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           DIDA_TOKEN: ${{ secrets.DIDA_TOKEN }}
         run: |
-          # 使用北京时间计算昨天
+          # 使用北京时间计算今天（处理当天的任务）
           if [ -z "$TARGET_DATE" ]; then
-            TARGET_DATE=$(date -d "yesterday" +%Y-%m-%d)
+            TARGET_DATE=$(date +%Y-%m-%d)
           fi
           echo "处理日期: $TARGET_DATE (北京时间)"
           python3 dida2diary_linker.py "$TARGET_DATE" run
