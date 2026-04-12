@@ -1,19 +1,19 @@
 name: Sync Xiaohongshu Links
 
 on:
-  # 每 5 分钟定时检查
+  # 每 30 分钟定时检查（与 keep2notion 保持一致）
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: "*/30 * * * *"
   # 手动触发
   workflow_dispatch:
-    inputs:
-      force:
-        description: '强制重新处理所有最近笔记（忽略已处理记录）'
-        required: false
-        default: 'false'
-  # 外部服务触发（如 cron-job.org）
+  # 外部服务触发
   repository_dispatch:
     types: [sync]
+
+# 防止并发运行，确保每次只运行一个实例
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -21,7 +21,7 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -34,6 +34,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm install
@@ -55,8 +56,8 @@ jobs:
             echo "无变化，无需提交"
           else
             git commit -m "chore: 更新已处理记录 $(date +%Y-%m-%d\ %H:%M:%S)"
-            # 允许 push 失败，不中断 workflow
-            git push origin main || echo "Push 失败，继续执行"
+            # 与 keep2notion 保持一致，允许 push 失败
+            git push origin main || echo "nothing to push"
           fi
 
       - name: Report status
@@ -69,4 +70,5 @@ jobs:
           echo "运行 ID: ${{ github.run_id }}"
           echo "=========================================="
 
-# Updated: Sun Apr 12 08:22:40 CST 2026
+# Updated: Sun Apr 12 08:56:40 CST 2026
+# 优化参考: keep2notion 仓库
