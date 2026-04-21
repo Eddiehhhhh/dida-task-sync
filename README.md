@@ -1,29 +1,36 @@
-# 新枝 → Get笔记 自动同步
+# 滴答清单任务自动同步
 
-自动检查新枝中的小红书链接，并同步到 Get笔记 进行解析。
+自动将滴答清单的任务同步到 Notion 任务中心，并关联到日记中心。
 
 ## 功能
 
-- 🔍 **智能时间过滤**：只检查最近 24 小时内创建的笔记，而不是前 N 条
-- 🔴 筛选小红书链接（xiaohongshu.com / xhslink.com）
-- 📝 调用 Get笔记 API 保存并解析内容
-- 🗑️ 自动归档新枝中的已处理记录
+- **滴答 → 任务中心**：根据滴答清单的任务，自动在 Notion 任务中心创建/更新任务
+- **任务 → 日记**：将当天的任务自动关联到 Notion 日记中心的「事件与任务」字段
+- **标题 + 时间双重验证**：关联时同时验证任务名称和日期，避免错误匹配（如"广州"匹配到"曼谷飞广州"）
+- **范围日期支持**：跨天任务（如出差 04-09 ~ 04-14），只要今天在范围内即匹配
+- **每天两次**：下午 16:00 和深夜 23:30（北京时间）自动运行
 - 🔒 使用 GitHub Secrets 安全存储 Token
-- 📊 详细的运行日志
+
+## 定时执行
+
+| 时间（北京时间） | 任务 |
+|------|------|
+| 15:50 | dida2taskcenter：同步滴答任务到任务中心 |
+| 16:00 | dida2diary：把任务关联到日记中心 |
+| 23:20 | dida2taskcenter：同步滴答任务到任务中心 |
+| 23:30 | dida2diary：把任务关联到日记中心 |
 
 ## 触发方式
 
-### 1. GitHub Schedule（自动）
-每 5 分钟自动运行一次。GitHub Actions 的定时任务可能有延迟，如果需要更可靠的触发，请使用外部 cron。
+### 1. 自动定时（GitHub Schedule）
+自动按上面时间表运行。
 
-### 2. 手动触发
-在 GitHub Actions 页面手动点击 "Run workflow"。
+### 2. 手动触发（推荐调试用）
+在 GitHub Actions 页面点击 "Run workflow"，可指定目标日期。
 
-### 3. 外部 Cron 触发（推荐）
-使用 cron-job.org 等服务，每 5 分钟触发一次：
-
+### 3. repository_dispatch（可靠触发）
 ```
-POST https://api.github.com/repos/Eddiehhhhh/xinzhi-to-getnote/dispatches
+POST https://api.github.com/repos/Eddiehhhhh/dida-task-sync/dispatches
 Headers:
   Authorization: Bearer <你的 GitHub PAT>
   Accept: application/vnd.github.v3+json
@@ -31,7 +38,7 @@ Body:
   {"event_type": "sync"}
 ```
 
-## 使用方法
+## 配置方法
 
 ### 1. Fork 本仓库
 
@@ -39,49 +46,50 @@ Body:
 
 在 GitHub 仓库的 `Settings → Secrets and variables → Actions` 中添加：
 
-| Secret Name | 说明 | 获取方式 |
-|-------------|------|---------|
-| `XINZHI_TOKEN` | 新枝 CLI AccessToken | 新枝 App → CLI Beta → 复制 AccessToken |
-| `GETNOTE_API_KEY` | Get笔记 API Key | Get笔记配置中获取 |
-| `GETNOTE_CLIENT_ID` | Get笔记 Client ID | Get笔记配置中获取（可选） |
+| Secret Name | 说明 |
+|-------------|------|
+| `NOTION_TOKEN` | Notion Integration Token |
+| `DIDA_TOKEN` | 滴答清单 API Token |
 
 ### 3. 启用 Actions
 
 在 GitHub 仓库的 `Actions` 页面启用工作流。
 
-### 4. 完成！
-
-现在你可以：
-- 在微信中向新枝小助手转发小红书链接
-- 等待自动同步到 Get笔记
-- 在 Get笔记 中查看解析后的内容
-
 ## 本地测试
 
 ```bash
-# 安装依赖
-npm install
+# 设置环境变量
+export NOTION_TOKEN=your_notion_token
+export DIDA_TOKEN=your_dida_token
 
-# 运行
-XINZHI_TOKEN=your_token GETNOTE_API_KEY=your_key node sync.js
+# 同步滴答任务到任务中心（dry-run 模拟）
+python3 dida2taskcenter_sync.py 2026-04-21
+
+# 同步任务到日记（dry-run 模拟）
+python3 dida2diary_linker.py 2026-04-21
+
+# 实际执行（不加 dry-run）
+python3 dida2taskcenter_sync.py 2026-04-21 run
+python3 dida2diary_linker.py 2026-04-21 run
 ```
 
 ## 工作原理
 
-1. 从新枝 API 获取最近 24 小时内创建的所有笔记
-2. 筛选包含 `xiaohongshu.com` 或 `xhslink.com` 链接的笔记
-3. 过滤掉已处理的笔记（使用 `processed_ids.json` 去重）
-4. 对每个新笔记：
-   - 调用 Get笔记 API 保存链接
-   - 轮询任务进度，等待内容解析
-   - 归档新枝记录
-5. 更新 `processed_ids.json` 并提交
+### 第一步：dida2taskcenter_sync.py
+1. 从滴答清单所有清单拉取当天任务
+2. 在 Notion 任务中心搜索是否已存在（精确匹配标题）
+3. 不存在 → 创建新任务；日期不一致 → 更新日期
+
+### 第二步：dida2diary_linker.py
+1. 同样拉取当天滴答任务
+2. 在任务中心用 `title.equals` 精确匹配标题
+3. 同时验证任务的日期范围包含今天
+4. 通过后把任务 ID 关联到日记当天条目的「事件与任务」字段
 
 ## 隐私说明
 
-- 本仓库为公开仓库，但所有敏感信息（Token、API Key）都存储在 GitHub Secrets 中
+- 本仓库为公开仓库，所有敏感信息（Token、API Key）都存储在 GitHub Secrets 中
 - 运行日志中不会输出任何敏感信息
-- `processed_ids.json` 记录已处理的笔记 ID，用于去重
 
 ## License
 
