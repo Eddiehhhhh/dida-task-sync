@@ -190,10 +190,16 @@ def get_dida_tasks_for_date(target_date: str) -> list:
     return matched_tasks
 
 
-def search_notion_task(query: str) -> list:
-    """在任务中心搜索任务（精确标题匹配）"""
+def search_notion_task(query: str, target_date: str) -> list:
+    """在任务中心搜索任务（标题+日期双重精确匹配）"""
     payload = {
-        "filter": {"property": "名称", "title": {"equals": query}},
+        "filter": {
+            "and": [
+                {"property": "名称", "title": {"equals": query.strip()}},
+                {"property": "日期", "date": {"on_or_before": target_date}},
+                {"property": "日期", "date": {"on_or_after": target_date}}
+            ]
+        },
         "page_size": 100
     }
     
@@ -369,8 +375,8 @@ def sync_dida_to_notion(target_date: str, dry_run: bool = True) -> dict:
         if not list_name or list_name == "未知":
             list_name = project_id
         
-        # 搜索任务中心
-        matched = search_notion_task(title)
+        # 搜索任务中心（标题+日期双重匹配）
+        matched = search_notion_task(title, target_date)
         
         if not matched:
             # 任务中心没有，直接跳过（不新建）
