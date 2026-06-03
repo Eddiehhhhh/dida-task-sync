@@ -183,13 +183,10 @@ def get_list_center_mapping() -> dict:
 
 
 def get_all_tasks_without_list() -> list:
-    """查询任务中心所有没有清单关联的任务"""
+    """查询任务中心所有任务，包含当前清单关联，用于修复缺失或错绑。"""
     tasks = []
     url = f"https://api.notion.com/v1/databases/{TASK_DB_ID}/query"
-    payload = {
-        "filter": {"property": "清单", "relation": {"is_empty": True}},
-        "page_size": 100
-    }
+    payload = {"page_size": 100}
 
     while url:
         resp = requests.post(url, headers=NOTION_HEADERS, json=payload, timeout=30)
@@ -208,8 +205,17 @@ def get_all_tasks_without_list() -> list:
             date_obj = date_data.get("date") or {}
             date_str = date_obj.get("start", "")[:10] if date_obj.get("start") else ""
 
+            list_data = props.get("清单") or {}
+            list_relations = list_data.get("relation") or []
+            list_ids = [r.get("id") for r in list_relations if r.get("id")]
+
             if title:
-                tasks.append({"id": page["id"], "title": title, "date": date_str})
+                tasks.append({
+                    "id": page["id"],
+                    "title": title,
+                    "date": date_str,
+                    "list_ids": list_ids,
+                })
 
         next_cursor = data.get("next_cursor")
         if next_cursor:
@@ -244,9 +250,10 @@ def get_list_name(project_id: str) -> str:
 # ============== 主流程 ==============
 
 def fix_list_relations(dry_run: bool = True) -> dict:
-    """主函数：修复所有缺少清单关联的任务"""
+    """主函数：修复清单缺失或错绑的任务"""
     results = {
         "total": 0,
+        "already_ok": [],
         "fixed": [],
         "not_found_in_dida": [],
         "no_mapping": [],
@@ -260,16 +267,17 @@ def fix_list_relations(dry_run: bool = True) -> dict:
     # 1. 加载清单中心映射
     print(f"\n📂 加载清单中心映射...")
     list_mapping = get_list_center_mapping()
+    list_name_by_page_id = {page_id: name for name, page_id in list_mapping.items()}
 
     # 2. 一次性拉取所有滴答任务
     print(f"\n📡 拉取滴答全部任务（仅此一次）...")
     all_tasks = fetch_all_dida_tasks()
 
-    # 3. 查询任务中心无清单任务
-    print(f"\n🔍 查询任务中心没有清单关联的任务...")
+    # 3. 查询任务中心所有任务，检查缺失或错绑
+    print(f"\n🔍 查询任务中心所有任务并检查清单关联...")
     tasks = get_all_tasks_without_list()
     results["total"] = len(tasks)
-    print(f"   找到 {len(tasks)} 个任务没有清单关联")
+    print(f"   找到 {len(tasks)} 个任务需要检查")
 
     if not tasks:
         return results
@@ -280,6 +288,7 @@ def fix_list_relations(dry_run: bool = True) -> dict:
         title = task["title"]
         task_id = task["id"]
         date_str = task.get("date", "")
+        current_list_ids = set(task.get("list_ids", []))
 
         # 本地缓存匹配
         project_id = find_project_id_in_cache(title, date_str, all_tasks)
@@ -298,14 +307,23 @@ def fix_list_relations(dry_run: bool = True) -> dict:
             results["no_mapping"].append(task["id"])
             continue
 
+        expected_list_ids = {list_page_id}
+        if current_list_ids == expected_list_ids:
+            print(f"   [{i}/{len(tasks)}] ✅ 清单已正确为[{list_name}]")
+            results["already_ok"].append(task_id)
+            continue
+
         # 更新清单关联
-        task_id = task["id"]
+        current_names = []
+        for current_id in current_list_ids:
+            current_names.append(list_name_by_page_id.get(current_id, current_id) if current_id else "")
+        current_desc = ",".join([name for name in current_names if name]) or "空"
         if dry_run:
-            print(f"   [{i}/{len(tasks)}] 🔄 清单设为[{list_name}] (dry_run)")
+            print(f"   [{i}/{len(tasks)}] 🔄 清单[{current_desc}] -> [{list_name}] (dry_run)")
             results["fixed"].append(task_id)
         else:
             if update_task_list(task_id, list_page_id):
-                print(f"   [{i}/{len(tasks)}] ✅ 清单设为[{list_name}]")
+                print(f"   [{i}/{len(tasks)}] ✅ 清单[{current_desc}] -> [{list_name}]")
                 results["fixed"].append(task_id)
             else:
                 print(f"   [{i}/{len(tasks)}] ❌ 更新失败")
@@ -315,7 +333,8 @@ def fix_list_relations(dry_run: bool = True) -> dict:
     print(f"\n{'='*60}")
     print("📊 执行结果汇总")
     print(f"{'='*60}")
-    print(f"   无清单任务总数: {results['total']}")
+    print(f"   检查任务总数: {results['total']}")
+    print(f"   已正确绑定: {len(results['already_ok'])}")
     print(f"   修复成功: {len(results['fixed'])}")
     print(f"   滴答中未找到: {len(results['not_found_in_dida'])}")
     print(f"   清单中心无映射: {len(results['no_mapping'])}")
