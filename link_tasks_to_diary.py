@@ -63,13 +63,17 @@ def dida_utc_to_bj_date(date_str: str) -> str:
     if not date_str:
         return ""
     try:
-        # 处理 Z 后缀
-        s = date_str.replace("Z", "+00:00").replace("z", "+00:00")
+        s = date_str
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        elif len(s) >= 6 and s[-5] in "+-":
+            # 处理 +0000 / +0800 格式（缺冒号）
+            s = s[:-5] + s[-5:-2] + ":" + s[-2:]
         dt = datetime.fromisoformat(s)
         return dt.astimezone(LOCAL_TZ).strftime("%Y-%m-%d")
-    except (ValueError, TypeError):
-        # 兜底：纯日期或无法解析格式
+    except Exception:
         return date_str[:10]
+
 
 
 def get_dida_tasks_for_date(target_date: str) -> list:
