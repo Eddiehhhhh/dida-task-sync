@@ -12,6 +12,7 @@
 
 import requests
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 
 # ============== 配置 ==============
@@ -52,6 +53,21 @@ PROJECT_IDS = {
     "自我管理": "65e40aed3e64110443527cf5",
     "购物": "6309c13dd063d1013009fb4e",
 }
+
+LOCAL_TZ = ZoneInfo("Asia/Shanghai")
+
+
+def dida_utc_to_bj_date(date_str: str) -> str:
+    """将滴答清单的UTC日期时间字符串转为北京时间日期"""
+    if not date_str:
+        return ""
+    try:
+        s = date_str.replace("Z", "+00:00").replace("z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        return dt.astimezone(LOCAL_TZ).strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return date_str[:10]
+
 
 # ============== 滴答任务缓存 ==============
 _ALL_DIDA_TASKS = None  # 全局缓存：一次性拉取的全部滴答任务
@@ -127,8 +143,8 @@ def find_project_id_in_cache(title: str, target_date: str, all_tasks: list) -> s
         if t.get("title", "").strip() != title:
             continue
 
-        due_date = t.get("dueDate", "")[:10] if t.get("dueDate") else ""
-        start_date = t.get("startDate", "")[:10] if t.get("startDate") else ""
+        due_date = dida_utc_to_bj_date(t.get("dueDate", ""))
+        start_date = dida_utc_to_bj_date(t.get("startDate", ""))
 
         # 精确日期匹配
         if due_date == target_date or start_date == target_date:
