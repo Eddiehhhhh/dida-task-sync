@@ -58,6 +58,20 @@ PROJECT_IDS = {
 LOCAL_TZ = ZoneInfo("Asia/Shanghai")
 
 
+def dida_utc_to_bj_date(date_str: str) -> str:
+    """将滴答清单的UTC日期时间字符串转为北京时间日期"""
+    if not date_str:
+        return ""
+    try:
+        # 处理 Z 后缀
+        s = date_str.replace("Z", "+00:00").replace("z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        return dt.astimezone(LOCAL_TZ).strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        # 兜底：纯日期或无法解析格式
+        return date_str[:10]
+
+
 def get_dida_tasks_for_date(target_date: str) -> list:
     """
     获取滴答清单指定日期的任务
@@ -101,8 +115,8 @@ def get_dida_tasks_for_date(target_date: str) -> list:
     matched_tasks = []
     for task in unique_tasks:
         title = task.get("title", "").strip()
-        due_date = task.get("dueDate", "")[:10] if task.get("dueDate") else ""
-        start_date = task.get("startDate", "")[:10] if task.get("startDate") else ""
+        due_date = dida_utc_to_bj_date(task.get("dueDate", ""))
+        start_date = dida_utc_to_bj_date(task.get("startDate", ""))
 
         is_match = False
         if due_date == target_date or start_date == target_date:
